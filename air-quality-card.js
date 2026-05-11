@@ -155,18 +155,25 @@ class AirQualityCard extends HTMLElement {
       );
 
       Promise.race([ready, timeout]).then(() => {
-        this._graphCard.setConfig({
-          type: "custom:mini-graph-card",
-          entities: graphEntities,
-          hours_to_show: 24,
-          points_per_hour: 2,
-          line_width: 2,
-          animate: true,
-          smoothing: true,
-          hour24: true,
-          height: 60,
-          show: { name: false, icon: false, state: false, legend: true, labels: false, fill: "fade" }
-        });
+        try {
+          this._graphCard.setConfig({
+            type: "custom:mini-graph-card",
+            entities: graphEntities,
+            hours_to_show: 24,
+            points_per_hour: 2,
+            line_width: 2,
+            animate: true,
+            smoothing: true,
+            hour24: true,
+            height: 60,
+            show: { name: false, icon: false, state: false, legend: true, labels: false, fill: "fade" }
+          });
+        } catch (err) {
+          // mini-graph-card is registered but rejected our config (e.g.
+          // breaking-change rename, schema mismatch). Tear down the graph
+          // section the same way we do on the not-installed timeout.
+          throw err;
+        }
 
         this._graphConfigured = true;
         this._graphCard.style.display = "block";
@@ -174,13 +181,18 @@ class AirQualityCard extends HTMLElement {
         if (this._hass) {
           this._graphCard.hass = this._hass;
         }
-      }).catch(() => {
-        // mini-graph-card isn't installed - hide the graph section
-        // entirely. The rest of the card still works.
+      }).catch((err) => {
+        // mini-graph-card isn't installed, OR setConfig threw. Either
+        // way: hide the graph section entirely. The rest of the card
+        // still works.
         this._graphConfigured = false;
         this._graphCard.style.display = "none";
         if (this.graphSection) this.graphSection.style.display = "none";
-        console.info("[air-quality-card] mini-graph-card not found, temp/humidity history graph disabled. Install via HACS to enable it.");
+        if (err && err.message && !err.message.includes("not installed")) {
+          console.warn("[air-quality-card] mini-graph-card setConfig failed:", err);
+        } else {
+          console.info("[air-quality-card] mini-graph-card not found, temp/humidity history graph disabled. Install via HACS to enable it.");
+        }
       });
     } else {
       this._graphCard.style.display = "none";
