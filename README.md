@@ -4,8 +4,11 @@ A modern, highly customizable air quality card for Home Assistant with support f
 
 ## Screenshots
 
-[Expanded State](file:///home/firstof9/github/ha-air-quality-card/screenshots/expanded.png)
-[Collapsed State](file:///home/firstof9/github/ha-air-quality-card/screenshots/collapsed.png)
+### Expanded View
+![Expanded State](screenshots/expanded.png)
+
+### Collapsed View
+![Collapsed State](screenshots/collapsed.png)
 
 ## Installation
 
