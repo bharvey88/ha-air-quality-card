@@ -1,4 +1,7 @@
 categories:
+  - title: '✨ Enhancements'
+    labels:
+      - 'enhancement'
   - title: '🚀 Features'
     labels:
       - 'feature'
@@ -40,10 +43,12 @@ autolabeler:
     title:
       - '/^ci(\(.+\))?:/i'
       - '/^build(\(.+\))?:/i'
+  - label: 'enhancement'
+    title:
+      - '/^perf(\(.+\))?:/i'
   - label: 'chore'
     title:
       - '/^style(\(.+\))?:/i'
-      - '/^perf(\(.+\))?:/i'
       - '/^test(\(.+\))?:/i'
 
 template: |
