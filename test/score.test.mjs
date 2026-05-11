@@ -168,7 +168,10 @@ describe('AQI_BANDS sanity', () => {
   test('each band has the expected shape', () => {
     for (const band of AQI_BANDS) {
       assert.ok(typeof band.max === 'number');
-      assert.ok(typeof band.color === 'string' && band.color.startsWith('#'));
+      // color (bright) and text (readable) are CSS custom-property
+      // strings with hex fallbacks, e.g. "var(--...-color, #86efac)".
+      assert.ok(typeof band.color === 'string' && band.color.length > 0);
+      assert.ok(typeof band.text === 'string' && band.text.length > 0);
       assert.ok(typeof band.label === 'string' && band.label.length > 0);
       assert.ok(typeof band.advice === 'string' && band.advice.length > 0);
     }

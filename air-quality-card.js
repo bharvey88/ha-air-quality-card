@@ -23,26 +23,28 @@ const POLLUTANT_THRESHOLDS = {
 };
 
 // US EPA AirNow AQI bands (https://www.airnow.gov/aqi/aqi-basics/).
-//   color: bright tint used for the ring, chip background, dot, tile bars
-//   text:  darker variant used wherever the band color is foreground text.
-//          Bright tints (Tailwind 200/300 family) fail WCAG AA on HA's
-//          light theme (~1.3:1 contrast); darker tints (Tailwind 600
-//          family) hit ~4:1 on light and ~5:1 on dark.
+//   color: bright tint for the ring, chip background, dot, tile bars
+//   text:  darker variant used wherever the band color is foreground text
+// Both are exposed as CSS custom properties so users can override them
+// in their theme YAML, card_mod, or :host overrides. Defaults: Tailwind
+// 200/300 (color) and 600 (text). The text variants give ~4:1 contrast
+// on light theme where the bright tints fail WCAG AA.
 const AQI_BANDS = [
-  { max: 50,       color: '#86efac', text: '#16a34a', label: 'Good',           advice: 'Air quality is satisfactory.' },
-  { max: 100,      color: '#fde68a', text: '#ca8a04', label: 'Moderate',       advice: 'Acceptable air quality.' },
-  { max: 150,      color: '#fdba74', text: '#ea580c', label: 'Unhealthy (SG)', advice: 'Sensitive groups may be affected.' },
-  { max: 200,      color: '#fca5a5', text: '#dc2626', label: 'Unhealthy',      advice: 'Everyone may experience health effects.' },
-  { max: 300,      color: '#d8b4fe', text: '#9333ea', label: 'V. Unhealthy',   advice: 'Health alert: risk is increased.' },
-  { max: Infinity, color: '#fda4af', text: '#e11d48', label: 'Hazardous',      advice: 'Emergency health warning.' },
+  { max: 50,       color: 'var(--air-quality-card-good-color, #86efac)',           text: 'var(--air-quality-card-good-text, #16a34a)',           label: 'Good',           advice: 'Air quality is satisfactory.' },
+  { max: 100,      color: 'var(--air-quality-card-moderate-color, #fde68a)',       text: 'var(--air-quality-card-moderate-text, #ca8a04)',       label: 'Moderate',       advice: 'Acceptable air quality.' },
+  { max: 150,      color: 'var(--air-quality-card-unhealthy-sg-color, #fdba74)',   text: 'var(--air-quality-card-unhealthy-sg-text, #ea580c)',   label: 'Unhealthy (SG)', advice: 'Sensitive groups may be affected.' },
+  { max: 200,      color: 'var(--air-quality-card-unhealthy-color, #fca5a5)',      text: 'var(--air-quality-card-unhealthy-text, #dc2626)',      label: 'Unhealthy',      advice: 'Everyone may experience health effects.' },
+  { max: 300,      color: 'var(--air-quality-card-very-unhealthy-color, #d8b4fe)', text: 'var(--air-quality-card-very-unhealthy-text, #9333ea)', label: 'V. Unhealthy',   advice: 'Health alert: risk is increased.' },
+  { max: Infinity, color: 'var(--air-quality-card-hazardous-color, #fda4af)',      text: 'var(--air-quality-card-hazardous-text, #e11d48)',      label: 'Hazardous',      advice: 'Emergency health warning.' },
 ];
 
-// Internal score-mode bands (lower is worse, 0-100 scale).
+// Internal score-mode bands (lower is worse, 0-100 scale). Colors map
+// to the same custom-property family as AQI_BANDS for consistency.
 const SCORE_BANDS = [
-  { min: 80,        color: '#86efac', text: '#16a34a', label: 'Good',     advice: 'Air quality is good' },
-  { min: 60,        color: '#fde68a', text: '#ca8a04', label: 'Moderate', advice: 'Air quality is moderate' },
-  { min: 40,        color: '#fdba74', text: '#ea580c', label: 'Poor',     advice: 'Consider ventilating' },
-  { min: -Infinity, color: '#fca5a5', text: '#dc2626', label: 'Bad',      advice: 'Ventilate now' },
+  { min: 80,        color: 'var(--air-quality-card-good-color, #86efac)',     text: 'var(--air-quality-card-good-text, #16a34a)',     label: 'Good',     advice: 'Air quality is good' },
+  { min: 60,        color: 'var(--air-quality-card-moderate-color, #fde68a)', text: 'var(--air-quality-card-moderate-text, #ca8a04)', label: 'Moderate', advice: 'Air quality is moderate' },
+  { min: 40,        color: 'var(--air-quality-card-poor-color, #fdba74)',     text: 'var(--air-quality-card-poor-text, #ea580c)',     label: 'Poor',     advice: 'Consider ventilating' },
+  { min: -Infinity, color: 'var(--air-quality-card-bad-color, #fca5a5)',      text: 'var(--air-quality-card-bad-text, #dc2626)',      label: 'Bad',      advice: 'Ventilate now' },
 ];
 
 // Translatable strings for the card-rendered UI. Translators can add a
@@ -67,13 +69,15 @@ const STRINGS = {
 // Pure helpers - extracted from the class so they can be unit-tested
 // without spinning up a DOM. See test/score.test.mjs.
 
-// color = bright tint for bar fill, text = readable on both themes
+// color = bright tint for bar fill, text = readable on both themes.
+// Both routed through CSS custom properties (defaults match the band
+// tables above).
 function calcThreshold(value, good, mod, high) {
-  if (value == null)   return { label: '--',     color: 'var(--divider-color, #444)', text: 'var(--secondary-text-color)', pct: 0 };
-  if (value <= good)   return { label: 'GOOD',   color: '#86efac', text: '#16a34a', pct: Math.min(100, (value / high) * 100) };
-  if (value <= mod)    return { label: 'MOD',    color: '#fde68a', text: '#ca8a04', pct: Math.min(100, (value / high) * 100) };
-  if (value <= high)   return { label: 'HIGH',   color: '#fdba74', text: '#ea580c', pct: Math.min(100, (value / high) * 100) };
-  return                      { label: 'V.HIGH', color: '#fca5a5', text: '#dc2626', pct: 100 };
+  if (value == null) return { label: '--',     color: 'var(--divider-color, #444)', text: 'var(--secondary-text-color)', pct: 0 };
+  if (value <= good) return { label: 'GOOD',   color: 'var(--air-quality-card-good-color, #86efac)',         text: 'var(--air-quality-card-good-text, #16a34a)',         pct: Math.min(100, (value / high) * 100) };
+  if (value <= mod)  return { label: 'MOD',    color: 'var(--air-quality-card-moderate-color, #fde68a)',     text: 'var(--air-quality-card-moderate-text, #ca8a04)',     pct: Math.min(100, (value / high) * 100) };
+  if (value <= high) return { label: 'HIGH',   color: 'var(--air-quality-card-unhealthy-sg-color, #fdba74)', text: 'var(--air-quality-card-unhealthy-sg-text, #ea580c)', pct: Math.min(100, (value / high) * 100) };
+  return                    { label: 'V.HIGH', color: 'var(--air-quality-card-unhealthy-color, #fca5a5)',    text: 'var(--air-quality-card-unhealthy-text, #dc2626)',    pct: 100 };
 }
 
 // Computes the calculated-score-mode headline state from the three
@@ -100,7 +104,7 @@ function computeScore({ pm25, voc, co2 }) {
     return {
       score: null,
       label: 'No data',
-      color: '#9ca3af',
+      color: 'var(--air-quality-card-no-data-color, #9ca3af)',
       text: 'var(--secondary-text-color)',
       advice: 'Configure PM2.5, VOC, or CO₂ sensors to see a calculated score.',
       pct: 0,
@@ -540,7 +544,12 @@ class AirQualityCard extends HTMLElement {
       if (co2 > 1500) advice = this.t('advice.co2VeryHigh');
     }
 
-    const r = parseInt(ringColor.slice(1, 3), 16), g = parseInt(ringColor.slice(3, 5), 16), b = parseInt(ringColor.slice(5, 7), 16);
+    // Compose the chip's faint background and border from ringColor via
+    // color-mix so user theme overrides on the *-color custom properties
+    // automatically tint the badge too. Falls back to transparent on
+    // browsers without color-mix support (Safari < 16.2, etc).
+    const chipBg = `color-mix(in srgb, ${ringColor} 12%, transparent)`;
+    const chipBorder = `color-mix(in srgb, ${ringColor} 35%, transparent)`;
 
     const T = POLLUTANT_THRESHOLDS;
     const pm1S  = this.calcThreshold(pm1,  T.pm1.good,  T.pm1.mod,  T.pm1.high);
@@ -573,7 +582,7 @@ class AirQualityCard extends HTMLElement {
               <span style="font-size:18px;font-weight:400;color:${textColor};">${displayValue}</span>
               <span style="font-size:10px;color:var(--secondary-text-color);">${displayValue === '--' ? '' : (hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100')}</span>
             </div>
-            <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${textColor};display:flex;align-items:center;gap:6px;">
+            <div style="background:${chipBg};border:1px solid ${chipBorder};border-radius:999px;padding:5px 12px;font-size:11px;color:${textColor};display:flex;align-items:center;gap:6px;">
               <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;" aria-hidden="true"></span>${displayLabel}
             </div>
           </div>
