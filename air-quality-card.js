@@ -133,6 +133,11 @@ class AirQualityCard extends HTMLElement {
 
     this.config = config;
 
+    // Drop cached state for entities that may have been removed or
+    // swapped. Without this, re-adding the same entity later starts
+    // with a stale "last" value and the first paint can be skipped.
+    this._lastStates = {};
+
     if (this._expanded === undefined) {
       this._expanded = config.default_expanded !== false;
     }
