@@ -40,6 +40,25 @@ const SCORE_BANDS = [
   { min: -Infinity, color: '#fca5a5', label: 'Bad',      advice: 'Ventilate now' },
 ];
 
+// Translatable strings for the card-rendered UI. Translators can add a
+// new top-level key (e.g. STRINGS.de) mirroring the 'en' shape and the
+// card will pick it up automatically based on hass.locale.language.
+// AQI/score band labels and advice stay on the band tables themselves
+// for now; localizing those is a separate, larger pass.
+const STRINGS = {
+  en: {
+    topName: { aqi: 'AQI Sensor', score: 'Calculated Score' },
+    subtitle: 'Climate · Air Quality',
+    ring: { aqi: 'AQI', score: 'SCORE' },
+    stats: { temp: 'TEMP', humidity: 'HUMIDITY' },
+    advice: {
+      vocHigh:     'VOCs detected',
+      co2High:     'CO2 high - open a window',
+      co2VeryHigh: 'CO2 very high - ventilate',
+    },
+  },
+};
+
 // Pure helpers - extracted from the class so they can be unit-tested
 // without spinning up a DOM. See test/score.test.mjs.
 
@@ -167,6 +186,15 @@ class AirQualityCard extends HTMLElement {
   }
 
   static getConfigElement() { return document.createElement("air-quality-card-editor"); }
+
+  // Translate a dotted-path string key from the STRINGS table, falling
+  // back to English when the HA locale doesn't have an entry. e.g.
+  // this.t('stats.temp') -> 'TEMP'.
+  t(path) {
+    const lang = this._hass?.locale?.language || this._hass?.language || 'en';
+    const lookup = (table) => path.split('.').reduce((o, k) => o?.[k], table);
+    return lookup(STRINGS[lang]) ?? lookup(STRINGS.en) ?? path;
+  }
 
   static getStubConfig() {
     return { title: "Living Room", default_expanded: true, aqi_entity: "", temp_entity: "", humid_entity: "", pm1_entity: "", pm25_entity: "", pm4_entity: "", pm10_entity: "", voc_entity: "", co2_entity: "" };
@@ -423,7 +451,7 @@ class AirQualityCard extends HTMLElement {
     const hasAqi = aqiStateObj && !isNaN(aqi);
 
     // Fetch the friendly name to display above the score
-    const topName = hasAqi ? (aqiStateObj.attributes.friendly_name || 'AQI Sensor') : 'Calculated Score';
+    const topName = hasAqi ? (aqiStateObj.attributes.friendly_name || this.t('topName.aqi')) : this.t('topName.score');
 
     const pm1 = this.safeNum(this.config.pm1_entity);
     const pm25 = this.safeNum(this.config.pm25_entity);
@@ -450,7 +478,7 @@ class AirQualityCard extends HTMLElement {
     if (hasAqi) {
       // --- MODE: OFFICIAL AQI ---
       displayValue = Math.round(aqi);
-      ringTopText = 'AQI'; // Gauge text
+      ringTopText = this.t('ring.aqi'); // Gauge text
       const band = AQI_BANDS.find(b => aqi <= b.max);
       ringColor = band.color; displayLabel = band.label; advice = band.advice;
 
@@ -461,7 +489,7 @@ class AirQualityCard extends HTMLElement {
       // --- MODE: CUSTOM SCORE FALLBACK ---
       const result = computeScore({ pm25, voc, co2 });
       displayValue = result.score == null ? '--' : result.score;
-      ringTopText = 'SCORE';
+      ringTopText = this.t('ring.score');
       ringColor = result.color;
       displayLabel = result.label;
       advice = result.advice;
@@ -473,9 +501,9 @@ class AirQualityCard extends HTMLElement {
     // "Emergency health warning" replaced with the meeker "open a window".
     const headlineIsBenign = displayLabel === 'Good' || displayLabel === 'Moderate';
     if (headlineIsBenign) {
-      if (voc > 200) advice = 'VOCs detected';
-      if (co2 > 1000) advice = 'CO2 high - open a window';
-      if (co2 > 1500) advice = 'CO2 very high - ventilate';
+      if (voc > 200) advice = this.t('advice.vocHigh');
+      if (co2 > 1000) advice = this.t('advice.co2High');
+      if (co2 > 1500) advice = this.t('advice.co2VeryHigh');
     }
 
     const r = parseInt(ringColor.slice(1, 3), 16), g = parseInt(ringColor.slice(3, 5), 16), b = parseInt(ringColor.slice(5, 7), 16);
@@ -503,7 +531,7 @@ class AirQualityCard extends HTMLElement {
             <ha-icon icon="mdi:chevron-down" style="color:var(--secondary-text-color); transition: transform 0.3s;" aria-hidden="true"></ha-icon>
             <div>
               <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
-              <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
+              <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">${this.t('subtitle')}</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:12px;" role="group" aria-label="${headlineAriaLabel}">
@@ -532,7 +560,7 @@ class AirQualityCard extends HTMLElement {
           <ha-icon icon="mdi:chevron-up" style="color:var(--secondary-text-color); transition: transform 0.3s;" aria-hidden="true"></ha-icon>
           <div>
             <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
-            <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
+            <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">${this.t('subtitle')}</div>
           </div>
         </div>
         <!-- Indicator hidden when expanded as requested -->
@@ -554,7 +582,7 @@ class AirQualityCard extends HTMLElement {
                 <span style="font-size:24px;font-weight:400;">${this.formatNum(temp, 1)}</span>
                 <span style="font-size:11px;color:var(--secondary-text-color);">${temp == null ? '' : tempUnit}</span>
               </div>
-              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">TEMP</div>
+              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">${this.t('stats.temp')}</div>
             </div>
             <div style="width:1px;background:var(--divider-color, #444);" aria-hidden="true"></div>
             <div style="${humid == null ? 'opacity:0.5;' : ''}" aria-label="Humidity: ${this.formatNum(humid, 0)} ${humidUnit}">
@@ -562,7 +590,7 @@ class AirQualityCard extends HTMLElement {
                 <span style="font-size:24px;font-weight:400;">${this.formatNum(humid, 0)}</span>
                 <span style="font-size:11px;color:var(--secondary-text-color);">${humid == null ? '' : humidUnit}</span>
               </div>
-              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">HUMIDITY</div>
+              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">${this.t('stats.humidity')}</div>
             </div>
           </div>
         </div>
