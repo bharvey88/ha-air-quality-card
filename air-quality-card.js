@@ -23,32 +23,38 @@ const POLLUTANT_THRESHOLDS = {
 };
 
 // US EPA AirNow AQI bands (https://www.airnow.gov/aqi/aqi-basics/).
+//   color: bright tint used for the ring, chip background, dot, tile bars
+//   text:  darker variant used wherever the band color is foreground text.
+//          Bright tints (Tailwind 200/300 family) fail WCAG AA on HA's
+//          light theme (~1.3:1 contrast); darker tints (Tailwind 600
+//          family) hit ~4:1 on light and ~5:1 on dark.
 const AQI_BANDS = [
-  { max: 50,       color: '#86efac', label: 'Good',           advice: 'Air quality is satisfactory.' },
-  { max: 100,      color: '#fde68a', label: 'Moderate',       advice: 'Acceptable air quality.' },
-  { max: 150,      color: '#fdba74', label: 'Unhealthy (SG)', advice: 'Sensitive groups may be affected.' },
-  { max: 200,      color: '#fca5a5', label: 'Unhealthy',      advice: 'Everyone may experience health effects.' },
-  { max: 300,      color: '#d8b4fe', label: 'V. Unhealthy',   advice: 'Health alert: risk is increased.' },
-  { max: Infinity, color: '#fda4af', label: 'Hazardous',      advice: 'Emergency health warning.' },
+  { max: 50,       color: '#86efac', text: '#16a34a', label: 'Good',           advice: 'Air quality is satisfactory.' },
+  { max: 100,      color: '#fde68a', text: '#ca8a04', label: 'Moderate',       advice: 'Acceptable air quality.' },
+  { max: 150,      color: '#fdba74', text: '#ea580c', label: 'Unhealthy (SG)', advice: 'Sensitive groups may be affected.' },
+  { max: 200,      color: '#fca5a5', text: '#dc2626', label: 'Unhealthy',      advice: 'Everyone may experience health effects.' },
+  { max: 300,      color: '#d8b4fe', text: '#9333ea', label: 'V. Unhealthy',   advice: 'Health alert: risk is increased.' },
+  { max: Infinity, color: '#fda4af', text: '#e11d48', label: 'Hazardous',      advice: 'Emergency health warning.' },
 ];
 
 // Internal score-mode bands (lower is worse, 0-100 scale).
 const SCORE_BANDS = [
-  { min: 80,        color: '#86efac', label: 'Good',     advice: 'Air quality is good' },
-  { min: 60,        color: '#fde68a', label: 'Moderate', advice: 'Air quality is moderate' },
-  { min: 40,        color: '#fdba74', label: 'Poor',     advice: 'Consider ventilating' },
-  { min: -Infinity, color: '#fca5a5', label: 'Bad',      advice: 'Ventilate now' },
+  { min: 80,        color: '#86efac', text: '#16a34a', label: 'Good',     advice: 'Air quality is good' },
+  { min: 60,        color: '#fde68a', text: '#ca8a04', label: 'Moderate', advice: 'Air quality is moderate' },
+  { min: 40,        color: '#fdba74', text: '#ea580c', label: 'Poor',     advice: 'Consider ventilating' },
+  { min: -Infinity, color: '#fca5a5', text: '#dc2626', label: 'Bad',      advice: 'Ventilate now' },
 ];
 
 // Pure helpers - extracted from the class so they can be unit-tested
 // without spinning up a DOM. See test/score.test.mjs.
 
+// color = bright tint for bar fill, text = readable on both themes
 function calcThreshold(value, good, mod, high) {
-  if (value == null) return { label: '--', color: 'var(--secondary-text-color)', pct: 0 };
-  if (value <= good) return { label: 'GOOD', color: '#86efac', pct: Math.min(100, (value / high) * 100) };
-  if (value <= mod) return { label: 'MOD', color: '#fde68a', pct: Math.min(100, (value / high) * 100) };
-  if (value <= high) return { label: 'HIGH', color: '#fdba74', pct: Math.min(100, (value / high) * 100) };
-  return { label: 'V.HIGH', color: '#fca5a5', pct: 100 };
+  if (value == null)   return { label: '--',     color: 'var(--divider-color, #444)', text: 'var(--secondary-text-color)', pct: 0 };
+  if (value <= good)   return { label: 'GOOD',   color: '#86efac', text: '#16a34a', pct: Math.min(100, (value / high) * 100) };
+  if (value <= mod)    return { label: 'MOD',    color: '#fde68a', text: '#ca8a04', pct: Math.min(100, (value / high) * 100) };
+  if (value <= high)   return { label: 'HIGH',   color: '#fdba74', text: '#ea580c', pct: Math.min(100, (value / high) * 100) };
+  return                      { label: 'V.HIGH', color: '#fca5a5', text: '#dc2626', pct: 100 };
 }
 
 // Computes the calculated-score-mode headline state from the three
@@ -76,6 +82,7 @@ function computeScore({ pm25, voc, co2 }) {
       score: null,
       label: 'No data',
       color: '#9ca3af',
+      text: 'var(--secondary-text-color)',
       advice: 'Configure PM2.5, VOC, or CO₂ sensors to see a calculated score.',
       pct: 0,
     };
@@ -93,6 +100,7 @@ function computeScore({ pm25, voc, co2 }) {
     score,
     label: band.label,
     color: band.color,
+    text: band.text,
     advice: band.advice,
     pct: score / 100,
   };
@@ -397,7 +405,7 @@ class AirQualityCard extends HTMLElement {
       <div style="padding:0 6px;min-width:0;overflow:hidden;${value == null ? 'opacity:0.5;' : ''}" role="group" aria-label="${name}: ${value == null ? 'no data' : value.toLocaleString() + ' ' + unit}, ${st.label}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px;" aria-hidden="true">
           <span style="font-size:11px;color:var(--secondary-text-color);font-weight:500;">${name}</span>
-          <span style="font-size:9px;color:${st.color};">${st.label}</span>
+          <span style="font-size:9px;color:${st.text};">${st.label}</span>
         </div>
         <div style="display:flex;align-items:baseline;gap:4px;" aria-hidden="true">
           <span style="font-size:22px;font-weight:400;line-height:1;">${value == null ? '--' : value.toLocaleString()}</span>
@@ -443,7 +451,7 @@ class AirQualityCard extends HTMLElement {
     const vocUnit = this.getUnit(this.config.voc_entity, 'index');
     const co2Unit = this.getUnit(this.config.co2_entity, 'ppm');
 
-    let displayValue, displayLabel, advice, ringColor, dashOffset, ringTopText;
+    let displayValue, displayLabel, advice, ringColor, textColor, dashOffset, ringTopText;
     const radius = 42;
     const circ = 2 * Math.PI * radius;
 
@@ -452,7 +460,7 @@ class AirQualityCard extends HTMLElement {
       displayValue = Math.round(aqi);
       ringTopText = 'AQI'; // Gauge text
       const band = AQI_BANDS.find(b => aqi <= b.max);
-      ringColor = band.color; displayLabel = band.label; advice = band.advice;
+      ringColor = band.color; textColor = band.text; displayLabel = band.label; advice = band.advice;
 
       const aqiPct = Math.min(Math.max(aqi, 0) / 500, 1);
       dashOffset = circ - (aqiPct * circ);
@@ -463,6 +471,7 @@ class AirQualityCard extends HTMLElement {
       displayValue = result.score == null ? '--' : result.score;
       ringTopText = 'SCORE';
       ringColor = result.color;
+      textColor = result.text;
       displayLabel = result.label;
       advice = result.advice;
       dashOffset = circ - (result.pct * circ);
@@ -508,10 +517,10 @@ class AirQualityCard extends HTMLElement {
           </div>
           <div style="display:flex;align-items:center;gap:12px;" role="group" aria-label="${headlineAriaLabel}">
             <div style="display:flex;align-items:baseline;gap:4px;">
-              <span style="font-size:18px;font-weight:400;color:${ringColor};">${displayValue}</span>
+              <span style="font-size:18px;font-weight:400;color:${textColor};">${displayValue}</span>
               <span style="font-size:10px;color:var(--secondary-text-color);">${displayValue === '--' ? '' : (hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100')}</span>
             </div>
-            <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${ringColor};display:flex;align-items:center;gap:6px;">
+            <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${textColor};display:flex;align-items:center;gap:6px;">
               <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;" aria-hidden="true"></span>${displayLabel}
             </div>
           </div>
@@ -543,7 +552,7 @@ class AirQualityCard extends HTMLElement {
           <div style="font-size:12px;color:var(--secondary-text-color);margin-bottom:4px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${topName}">${topName}</div>
           
           <div style="display:flex;align-items:baseline;gap:6px;" role="group" aria-label="${headlineAriaLabel}">
-            <span style="font-size:54px;font-weight:400;color:${ringColor};line-height:1;">${displayValue}</span>
+            <span style="font-size:clamp(36px, 8vw, 54px);font-weight:400;color:${textColor};line-height:1;">${displayValue}</span>
             <span style="font-size:14px;color:var(--secondary-text-color);">${hasAqi || displayValue === '--' ? '' : '/ 100'}</span>
           </div>
           <div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${advice}</div>
@@ -575,7 +584,7 @@ class AirQualityCard extends HTMLElement {
           </svg>
           <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;" aria-hidden="true">
             <div style="font-size:11px;color:var(--secondary-text-color);">${ringTopText}</div>
-            <div style="font-size:13px;color:${ringColor};font-weight:500;text-align:center;line-height:1.1;margin-top:2px;max-width:80px;">${hasAqi || displayValue === '--' ? displayLabel : displayValue + '%'}</div>
+            <div style="font-size:13px;color:${textColor};font-weight:500;text-align:center;line-height:1.1;margin-top:2px;max-width:80px;">${hasAqi || displayValue === '--' ? displayLabel : displayValue + '%'}</div>
           </div>
         </div>
       </div>
