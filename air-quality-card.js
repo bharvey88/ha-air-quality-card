@@ -1,4 +1,15 @@
 // ============================================================
+// Constants
+// ============================================================
+const VERSION = '0.1.0';
+
+console.info(
+  `%c  AIR-QUALITY-CARD  %c  Version ${VERSION}  `,
+  'color: white; font-weight: bold; background: #03a9f4',
+  'color: #03a9f4; font-weight: bold; background: white'
+);
+
+// ============================================================
 // Visual UI Editor
 // ============================================================
 class AirQualityCardEditor extends HTMLElement {
