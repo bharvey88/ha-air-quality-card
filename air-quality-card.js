@@ -73,7 +73,7 @@ class AirQualityCard extends HTMLElement {
   static getConfigElement() { return document.createElement("air-quality-card-editor"); }
 
   static getStubConfig() {
-    return { title: "Living Room", aqi_entity: "", temp_entity: "", humid_entity: "", pm1_entity: "", pm25_entity: "", pm10_entity: "", voc_entity: "", co2_entity: "" };
+    return { title: "Living Room", default_expanded: true, aqi_entity: "", temp_entity: "", humid_entity: "", pm1_entity: "", pm25_entity: "", pm4_entity: "", pm10_entity: "", voc_entity: "", co2_entity: "" };
   }
 
   setConfig(config) {
