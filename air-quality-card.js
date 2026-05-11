@@ -362,10 +362,21 @@ class AirQualityCard extends HTMLElement {
       // weight. Missing pollutants are dropped and the remaining weights
       // renormalize to 100, so a partial sensor set still spans 0-100
       // instead of getting an artificial ceiling.
+      //
+      // Divisor calibration (the value at which a pollutant's penalty
+      // saturates):
+      //   PM2.5 75 ug/m3 -> US EPA "Unhealthy for Sensitive Groups" boundary
+      //   VOC   500      -> Sensirion VOC Index ceiling (full scale)
+      //   CO2   2200 ppm above 400 baseline -> Harvard COGfx cognitive
+      //                     impact threshold (~2600 ppm absolute)
+      // Previous (v0.1) divisors were tuned for the additive formula and
+      // were too aggressive once weights renormalized: a single CO2
+      // reading of 1100 ppm dropped the score to ~56 ("Poor"), which
+      // conflicts with the ASHRAE/Harvard guidance saying ~1100 is fine.
       const pollutants = [
-        { value: pm25, divisor: 35,   weight: 40 },
-        { value: voc,  divisor: 300,  weight: 25 },
-        { value: co2 != null ? co2 - 400 : null, divisor: 1600, weight: 35 },
+        { value: pm25, divisor: 75,   weight: 40 },
+        { value: voc,  divisor: 500,  weight: 25 },
+        { value: co2 != null ? co2 - 400 : null, divisor: 2200, weight: 35 },
       ].filter(p => p.value != null);
 
       if (pollutants.length === 0) {
