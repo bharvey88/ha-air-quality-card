@@ -265,7 +265,7 @@ class AirQualityCard extends HTMLElement {
 
     if (hasAqi && !isNaN(aqi)) {
       // --- MODE: OFFICIAL AQI ---
-      displayValue = aqi;
+      displayValue = Math.round(aqi);
       ringTopText = 'AQI'; // Gauge text
       ringColor = '#86efac'; displayLabel = 'Good'; advice = 'Air quality is satisfactory.';
       if (aqi > 50) { ringColor = '#fde68a'; displayLabel = 'Moderate'; advice = 'Acceptable air quality.'; }
@@ -274,7 +274,7 @@ class AirQualityCard extends HTMLElement {
       if (aqi > 200) { ringColor = '#d8b4fe'; displayLabel = 'V. Unhealthy'; advice = 'Health alert: risk is increased.'; }
       if (aqi > 300) { ringColor = '#fda4af'; displayLabel = 'Hazardous'; advice = 'Emergency health warning.'; }
 
-      const aqiPct = Math.min(aqi / 500, 1);
+      const aqiPct = Math.min(Math.max(aqi, 0) / 500, 1);
       dashOffset = circ - (aqiPct * circ);
 
     } else {
@@ -282,7 +282,7 @@ class AirQualityCard extends HTMLElement {
       const pm25Penalty = Math.min(40, Math.max(0, (pm25 / 35) * 40));
       const vocPenalty = Math.min(25, Math.max(0, (voc / 300) * 25));
       const co2Penalty = Math.min(35, Math.max(0, ((co2 - 400) / 1600) * 35));
-      const score = Math.max(0, Math.round(100 - pm25Penalty - vocPenalty - co2Penalty));
+      const score = Math.min(100, Math.max(0, Math.round(100 - pm25Penalty - vocPenalty - co2Penalty)));
 
       displayValue = score;
       ringTopText = 'SCORE'; // Gauge text
