@@ -10,6 +10,9 @@ A modern, highly customizable air quality card for Home Assistant with support f
 ### Collapsed View
 ![Collapsed State](screenshots/collapsed.png)
 
+### Visual Configuration
+![Configuration Editor](screenshots/config.png)
+
 ## Installation
 
 ### HACS (Recommended)
