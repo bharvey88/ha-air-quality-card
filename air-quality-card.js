@@ -119,16 +119,25 @@ class AirQualityCard extends HTMLElement {
       throw new Error('Invalid configuration: expected an object');
     }
 
-    const entityKeys = [
-      'aqi_entity', 'temp_entity', 'humid_entity',
-      'pm1_entity', 'pm25_entity', 'pm4_entity', 'pm10_entity',
-      'voc_entity', 'co2_entity'
-    ];
-    for (const key of entityKeys) {
+    // Per-slot allowed entity domains. aqi_entity also accepts the
+    // air_quality.* domain since some HA integrations expose AQI there
+    // rather than as a sensor.
+    const allowedDomains = {
+      aqi_entity:    ['sensor.', 'air_quality.'],
+      temp_entity:   ['sensor.'],
+      humid_entity:  ['sensor.'],
+      pm1_entity:    ['sensor.'],
+      pm25_entity:   ['sensor.'],
+      pm4_entity:    ['sensor.'],
+      pm10_entity:   ['sensor.'],
+      voc_entity:    ['sensor.'],
+      co2_entity:    ['sensor.'],
+    };
+    for (const [key, prefixes] of Object.entries(allowedDomains)) {
       const value = config[key];
       if (value == null || value === '') continue;
-      if (typeof value !== 'string' || !value.startsWith('sensor.')) {
-        throw new Error(`${key} must be a sensor.* entity, got: ${value}`);
+      if (typeof value !== 'string' || !prefixes.some(p => value.startsWith(p))) {
+        throw new Error(`${key} must be one of (${prefixes.map(p => p + '*').join(', ')}), got: ${value}`);
       }
     }
 
