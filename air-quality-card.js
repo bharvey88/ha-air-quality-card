@@ -291,11 +291,15 @@ class AirQualityCard extends HTMLElement {
   }
 
   safeNum(entityId) {
-    if (!entityId || !this._hass.states[entityId]) return 0;
+    if (!entityId || !this._hass.states[entityId]) return null;
     const state = this._hass.states[entityId].state;
-    if (state === 'unavailable' || state === 'unknown') return 0;
+    if (state === 'unavailable' || state === 'unknown') return null;
     const num = parseFloat(state);
-    return isNaN(num) ? 0 : num;
+    return isNaN(num) ? null : num;
+  }
+
+  formatNum(num, decimals = 1) {
+    return num == null ? '--' : num.toFixed(decimals);
   }
 
   getUnit(entityId, defaultUnit) {
@@ -304,6 +308,7 @@ class AirQualityCard extends HTMLElement {
   }
 
   calcThreshold(value, good, mod, high) {
+    if (value == null) return { label: '--', color: 'var(--secondary-text-color)', pct: 0 };
     if (value <= good) return { label: 'GOOD', color: '#86efac', pct: Math.min(100, (value / high) * 100) };
     if (value <= mod) return { label: 'MOD', color: '#fde68a', pct: Math.min(100, (value / high) * 100) };
     if (value <= high) return { label: 'HIGH', color: '#fdba74', pct: Math.min(100, (value / high) * 100) };
@@ -353,18 +358,40 @@ class AirQualityCard extends HTMLElement {
 
     } else {
       // --- MODE: CUSTOM SCORE FALLBACK ---
-      const pm25Penalty = Math.min(40, Math.max(0, (pm25 / 35) * 40));
-      const vocPenalty = Math.min(25, Math.max(0, (voc / 300) * 25));
-      const co2Penalty = Math.min(35, Math.max(0, ((co2 - 400) / 1600) * 35));
-      const score = Math.min(100, Math.max(0, Math.round(100 - pm25Penalty - vocPenalty - co2Penalty)));
+      // Each pollutant contributes a penalty fraction in [0, 1] times its
+      // weight. Missing pollutants are dropped and the remaining weights
+      // renormalize to 100, so a partial sensor set still spans 0-100
+      // instead of getting an artificial ceiling.
+      const pollutants = [
+        { value: pm25, divisor: 35,   weight: 40 },
+        { value: voc,  divisor: 300,  weight: 25 },
+        { value: co2 != null ? co2 - 400 : null, divisor: 1600, weight: 35 },
+      ].filter(p => p.value != null);
 
-      displayValue = score;
-      ringTopText = 'SCORE'; // Gauge text
-      const band = SCORE_BANDS.find(b => score >= b.min);
-      ringColor = band.color; displayLabel = band.label; advice = band.advice;
+      if (pollutants.length === 0) {
+        // No pollutant data at all - render an honest empty state.
+        displayValue = '--';
+        ringTopText = 'SCORE';
+        ringColor = '#9ca3af';
+        displayLabel = 'No data';
+        advice = 'Configure pollutant sensors to see air quality.';
+        dashOffset = circ;
+      } else {
+        const totalWeight = pollutants.reduce((s, p) => s + p.weight, 0);
+        const totalPenalty = pollutants.reduce((s, p) => {
+          const frac = Math.min(1, Math.max(0, p.value / p.divisor));
+          return s + frac * (p.weight / totalWeight) * 100;
+        }, 0);
+        const score = Math.min(100, Math.max(0, Math.round(100 - totalPenalty)));
 
-      const scorePct = score / 100;
-      dashOffset = circ - (scorePct * circ);
+        displayValue = score;
+        ringTopText = 'SCORE'; // Gauge text
+        const band = SCORE_BANDS.find(b => score >= b.min);
+        ringColor = band.color; displayLabel = band.label; advice = band.advice;
+
+        const scorePct = score / 100;
+        dashOffset = circ - (scorePct * circ);
+      }
     }
 
     // Specific pollutant overrides for advice, but only when the headline
@@ -388,14 +415,14 @@ class AirQualityCard extends HTMLElement {
     const co2S  = this.calcThreshold(co2,  T.co2.good,  T.co2.mod,  T.co2.high);
 
     const renderTile = (name, value, unit, st) => `
-      <div style="padding:0 6px;min-width:0;overflow:hidden;" role="group" aria-label="${name}: ${value.toLocaleString()} ${unit}, ${st.label}">
+      <div style="padding:0 6px;min-width:0;overflow:hidden;${value == null ? 'opacity:0.5;' : ''}" role="group" aria-label="${name}: ${value == null ? 'no data' : value.toLocaleString() + ' ' + unit}, ${st.label}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px;" aria-hidden="true">
           <span style="font-size:11px;color:var(--secondary-text-color);font-weight:500;">${name}</span>
           <span style="font-size:9px;color:${st.color};">${st.label}</span>
         </div>
         <div style="display:flex;align-items:baseline;gap:4px;" aria-hidden="true">
-          <span style="font-size:22px;font-weight:400;line-height:1;">${value.toLocaleString()}</span>
-          <span style="font-size:10px;color:var(--secondary-text-color);">${unit}</span>
+          <span style="font-size:22px;font-weight:400;line-height:1;">${value == null ? '--' : value.toLocaleString()}</span>
+          <span style="font-size:10px;color:var(--secondary-text-color);">${value == null ? '' : unit}</span>
         </div>
         <div style="height:3px;background:var(--divider-color, #444);border-radius:2px;overflow:hidden;margin-top:8px;" role="progressbar" aria-valuenow="${Math.round(st.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="${name} level">
           <div style="height:100%;width:${st.pct}%;background:${st.color};"></div>
@@ -423,7 +450,7 @@ class AirQualityCard extends HTMLElement {
           <div style="display:flex;align-items:center;gap:12px;" role="status" aria-live="polite">
             <div style="display:flex;align-items:baseline;gap:4px;">
               <span style="font-size:18px;font-weight:400;color:${ringColor};">${displayValue}</span>
-              <span style="font-size:10px;color:var(--secondary-text-color);">${hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100'}</span>
+              <span style="font-size:10px;color:var(--secondary-text-color);">${displayValue === '--' ? '' : (hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100')}</span>
             </div>
             <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${ringColor};display:flex;align-items:center;gap:6px;">
               <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;" aria-hidden="true"></span>${displayLabel}
@@ -458,23 +485,23 @@ class AirQualityCard extends HTMLElement {
           
           <div style="display:flex;align-items:baseline;gap:6px;" role="status" aria-live="polite" aria-label="${headlineAriaLabel}">
             <span style="font-size:54px;font-weight:400;color:${ringColor};line-height:1;">${displayValue}</span>
-            <span style="font-size:14px;color:var(--secondary-text-color);">${hasAqi ? '' : '/ 100'}</span>
+            <span style="font-size:14px;color:var(--secondary-text-color);">${hasAqi || displayValue === '--' ? '' : '/ 100'}</span>
           </div>
           <div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${advice}</div>
 
           <div style="display:flex;gap:14px;margin-top:14px;">
-            <div aria-label="Temperature: ${temp.toFixed(1)} ${tempUnit}">
+            <div style="${temp == null ? 'opacity:0.5;' : ''}" aria-label="Temperature: ${this.formatNum(temp, 1)} ${tempUnit}">
               <div style="display:flex;align-items:baseline;gap:4px;">
-                <span style="font-size:24px;font-weight:400;">${temp.toFixed(1)}</span>
-                <span style="font-size:11px;color:var(--secondary-text-color);">${tempUnit}</span>
+                <span style="font-size:24px;font-weight:400;">${this.formatNum(temp, 1)}</span>
+                <span style="font-size:11px;color:var(--secondary-text-color);">${temp == null ? '' : tempUnit}</span>
               </div>
               <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">TEMP</div>
             </div>
             <div style="width:1px;background:var(--divider-color, #444);" aria-hidden="true"></div>
-            <div aria-label="Humidity: ${humid.toFixed(0)} ${humidUnit}">
+            <div style="${humid == null ? 'opacity:0.5;' : ''}" aria-label="Humidity: ${this.formatNum(humid, 0)} ${humidUnit}">
               <div style="display:flex;align-items:baseline;gap:4px;">
-                <span style="font-size:24px;font-weight:400;">${humid.toFixed(0)}</span>
-                <span style="font-size:11px;color:var(--secondary-text-color);">${humidUnit}</span>
+                <span style="font-size:24px;font-weight:400;">${this.formatNum(humid, 0)}</span>
+                <span style="font-size:11px;color:var(--secondary-text-color);">${humid == null ? '' : humidUnit}</span>
               </div>
               <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">HUMIDITY</div>
             </div>
@@ -489,7 +516,7 @@ class AirQualityCard extends HTMLElement {
           </svg>
           <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;" aria-hidden="true">
             <div style="font-size:11px;color:var(--secondary-text-color);">${ringTopText}</div>
-            <div style="font-size:13px;color:${ringColor};font-weight:500;text-align:center;line-height:1.1;margin-top:2px;max-width:80px;">${hasAqi ? displayLabel : displayValue + '%'}</div>
+            <div style="font-size:13px;color:${ringColor};font-weight:500;text-align:center;line-height:1.1;margin-top:2px;max-width:80px;">${hasAqi || displayValue === '--' ? displayLabel : displayValue + '%'}</div>
           </div>
         </div>
       </div>
