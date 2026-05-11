@@ -3,6 +3,43 @@
 // ============================================================
 const VERSION = '0.1.0';
 
+// Pollutant tile thresholds: { good, mod, high } in the sensor's native unit.
+// Sources:
+//   PM1   - WHO 2021 AQG (no formal limit; values aligned with PM2.5 short-term band)
+//   PM2.5 - US EPA NAAQS: 12 ug/m3 annual, 35 ug/m3 24-hour, ~75 ug/m3 unhealthy
+//   PM4   - extrapolated between PM2.5 and PM10 (no formal standard)
+//   PM10  - WHO 2021 AQG 24-hour 50 ug/m3, US EPA NAAQS 24-hour 150 ug/m3
+//   VOC   - Sensirion VOC Index (0-500, baseline 100). NOT valid for TVOC sensors
+//           reporting ppb or ug/m3 - see issue tracker for the open discussion.
+//   CO2   - ASHRAE 62.1 ventilation guidance ~1000 ppm, Harvard COGfx cognitive
+//           impact threshold ~2000 ppm
+const POLLUTANT_THRESHOLDS = {
+  pm1:  { good: 10,  mod: 25,   high: 50   },
+  pm25: { good: 12,  mod: 35,   high: 75   },
+  pm4:  { good: 20,  mod: 50,   high: 100  },
+  pm10: { good: 50,  mod: 150,  high: 250  },
+  voc:  { good: 100, mod: 200,  high: 300  },
+  co2:  { good: 800, mod: 1200, high: 2000 },
+};
+
+// US EPA AirNow AQI bands (https://www.airnow.gov/aqi/aqi-basics/).
+const AQI_BANDS = [
+  { max: 50,       color: '#86efac', label: 'Good',           advice: 'Air quality is satisfactory.' },
+  { max: 100,      color: '#fde68a', label: 'Moderate',       advice: 'Acceptable air quality.' },
+  { max: 150,      color: '#fdba74', label: 'Unhealthy (SG)', advice: 'Sensitive groups may be affected.' },
+  { max: 200,      color: '#fca5a5', label: 'Unhealthy',      advice: 'Everyone may experience health effects.' },
+  { max: 300,      color: '#d8b4fe', label: 'V. Unhealthy',   advice: 'Health alert: risk is increased.' },
+  { max: Infinity, color: '#fda4af', label: 'Hazardous',      advice: 'Emergency health warning.' },
+];
+
+// Internal score-mode bands (lower is worse, 0-100 scale).
+const SCORE_BANDS = [
+  { min: 80,        color: '#86efac', label: 'Good',     advice: 'Air quality is good' },
+  { min: 60,        color: '#fde68a', label: 'Moderate', advice: 'Air quality is moderate' },
+  { min: 40,        color: '#fdba74', label: 'Poor',     advice: 'Consider ventilating' },
+  { min: -Infinity, color: '#fca5a5', label: 'Bad',      advice: 'Ventilate now' },
+];
+
 console.info(
   `%c  AIR-QUALITY-CARD  %c  Version ${VERSION}  `,
   'color: white; font-weight: bold; background: #03a9f4',
@@ -299,12 +336,8 @@ class AirQualityCard extends HTMLElement {
       // --- MODE: OFFICIAL AQI ---
       displayValue = Math.round(aqi);
       ringTopText = 'AQI'; // Gauge text
-      ringColor = '#86efac'; displayLabel = 'Good'; advice = 'Air quality is satisfactory.';
-      if (aqi > 50) { ringColor = '#fde68a'; displayLabel = 'Moderate'; advice = 'Acceptable air quality.'; }
-      if (aqi > 100) { ringColor = '#fdba74'; displayLabel = 'Unhealthy (SG)'; advice = 'Sensitive groups may be affected.'; }
-      if (aqi > 150) { ringColor = '#fca5a5'; displayLabel = 'Unhealthy'; advice = 'Everyone may experience health effects.'; }
-      if (aqi > 200) { ringColor = '#d8b4fe'; displayLabel = 'V. Unhealthy'; advice = 'Health alert: risk is increased.'; }
-      if (aqi > 300) { ringColor = '#fda4af'; displayLabel = 'Hazardous'; advice = 'Emergency health warning.'; }
+      const band = AQI_BANDS.find(b => aqi <= b.max);
+      ringColor = band.color; displayLabel = band.label; advice = band.advice;
 
       const aqiPct = Math.min(Math.max(aqi, 0) / 500, 1);
       dashOffset = circ - (aqiPct * circ);
@@ -318,10 +351,8 @@ class AirQualityCard extends HTMLElement {
 
       displayValue = score;
       ringTopText = 'SCORE'; // Gauge text
-      ringColor = '#86efac'; displayLabel = 'Good'; advice = 'Air quality is good';
-      if (score < 80) { ringColor = '#fde68a'; displayLabel = 'Moderate'; advice = 'Air quality is moderate'; }
-      if (score < 60) { ringColor = '#fdba74'; displayLabel = 'Poor'; advice = 'Consider ventilating'; }
-      if (score < 40) { ringColor = '#fca5a5'; displayLabel = 'Bad'; advice = 'Ventilate now'; }
+      const band = SCORE_BANDS.find(b => score >= b.min);
+      ringColor = band.color; displayLabel = band.label; advice = band.advice;
 
       const scorePct = score / 100;
       dashOffset = circ - (scorePct * circ);
@@ -339,12 +370,13 @@ class AirQualityCard extends HTMLElement {
 
     const r = parseInt(ringColor.slice(1, 3), 16), g = parseInt(ringColor.slice(3, 5), 16), b = parseInt(ringColor.slice(5, 7), 16);
 
-    const pm1S = this.calcThreshold(pm1, 10, 25, 50);
-    const pm25S = this.calcThreshold(pm25, 12, 35, 75);
-    const pm4S = this.calcThreshold(pm4, 20, 50, 100);
-    const pm10S = this.calcThreshold(pm10, 50, 150, 250);
-    const vocS = this.calcThreshold(voc, 100, 200, 300);
-    const co2S = this.calcThreshold(co2, 800, 1200, 2000);
+    const T = POLLUTANT_THRESHOLDS;
+    const pm1S  = this.calcThreshold(pm1,  T.pm1.good,  T.pm1.mod,  T.pm1.high);
+    const pm25S = this.calcThreshold(pm25, T.pm25.good, T.pm25.mod, T.pm25.high);
+    const pm4S  = this.calcThreshold(pm4,  T.pm4.good,  T.pm4.mod,  T.pm4.high);
+    const pm10S = this.calcThreshold(pm10, T.pm10.good, T.pm10.mod, T.pm10.high);
+    const vocS  = this.calcThreshold(voc,  T.voc.good,  T.voc.mod,  T.voc.high);
+    const co2S  = this.calcThreshold(co2,  T.co2.good,  T.co2.mod,  T.co2.high);
 
     const renderTile = (name, value, unit, st) => `
       <div style="padding:0 6px;min-width:0;overflow:hidden;">
