@@ -366,7 +366,32 @@ class AirQualityCard extends HTMLElement {
   }
 
   renderInit() {
+    // Inject a <style> block once so we can use media queries against
+    // the rest of the inline-styled markup. The selectors target classes
+    // we add to specific elements in updateData(); inline styles still
+    // win on desktop, but our media-query overrides take precedence at
+    // narrow widths via specificity + the cascade.
+    if (!this.shadowRoot.querySelector('style')) {
+      const styles = document.createElement('style');
+      styles.textContent = `
+        @media (max-width: 380px) {
+          .aq-card { padding: 14px !important; }
+          .aq-ring { width: 72px !important; height: 72px !important; }
+          .aq-ring-center .aq-ring-label { font-size: 11px !important; }
+          .aq-headline { font-size: clamp(28px, 12vw, 44px) !important; }
+          .aq-top-row { padding-right: 8px !important; }
+          .aq-stats { gap: 10px !important; }
+          .aq-stats-value { font-size: 20px !important; }
+        }
+        @media (max-width: 300px) {
+          .aq-tile-grid { grid-template-columns: 1fr !important; }
+        }
+      `;
+      this.shadowRoot.appendChild(styles);
+    }
+
     const card = document.createElement('ha-card');
+    card.classList.add('aq-card');
     card.style.cssText = `
       padding: 20px;
       color: var(--primary-text-color);
@@ -576,19 +601,19 @@ class AirQualityCard extends HTMLElement {
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="flex-grow: 1; overflow: hidden; padding-right: 14px;">
+        <div class="aq-top-row" style="flex-grow: 1; overflow: hidden; padding-right: 14px;">
           <div style="font-size:12px;color:var(--secondary-text-color);margin-bottom:4px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${topName}">${topName}</div>
-          
+
           <div style="display:flex;align-items:baseline;gap:6px;" role="group" aria-label="${headlineAriaLabel}">
-            <span style="font-size:clamp(36px, 8vw, 54px);font-weight:400;color:${textColor};line-height:1;">${displayValue}</span>
+            <span class="aq-headline" style="font-size:clamp(36px, 8vw, 54px);font-weight:400;color:${textColor};line-height:1;">${displayValue}</span>
             <span style="font-size:14px;color:var(--secondary-text-color);">${hasAqi || displayValue === '--' ? '' : '/ 100'}</span>
           </div>
           <div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${advice}</div>
 
-          <div style="display:flex;gap:14px;margin-top:14px;">
+          <div class="aq-stats" style="display:flex;gap:14px;margin-top:14px;">
             <div style="${temp == null ? 'opacity:0.5;' : ''}" aria-label="Temperature: ${this.formatNum(temp, 1)} ${tempUnit}">
               <div style="display:flex;align-items:baseline;gap:4px;">
-                <span style="font-size:24px;font-weight:400;">${this.formatNum(temp, 1)}</span>
+                <span class="aq-stats-value" style="font-size:24px;font-weight:400;">${this.formatNum(temp, 1)}</span>
                 <span style="font-size:11px;color:var(--secondary-text-color);">${temp == null ? '' : tempUnit}</span>
               </div>
               <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">${this.t('stats.temp')}</div>
@@ -596,7 +621,7 @@ class AirQualityCard extends HTMLElement {
             <div style="width:1px;background:var(--divider-color, #444);" aria-hidden="true"></div>
             <div style="${humid == null ? 'opacity:0.5;' : ''}" aria-label="Humidity: ${this.formatNum(humid, 0)} ${humidUnit}">
               <div style="display:flex;align-items:baseline;gap:4px;">
-                <span style="font-size:24px;font-weight:400;">${this.formatNum(humid, 0)}</span>
+                <span class="aq-stats-value" style="font-size:24px;font-weight:400;">${this.formatNum(humid, 0)}</span>
                 <span style="font-size:11px;color:var(--secondary-text-color);">${humid == null ? '' : humidUnit}</span>
               </div>
               <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">${this.t('stats.humidity')}</div>
@@ -604,14 +629,14 @@ class AirQualityCard extends HTMLElement {
           </div>
         </div>
 
-        <div style="position:relative;width:100px;height:100px;flex-shrink:0;" role="meter" aria-valuenow="${hasAqi ? displayValue : displayValue}" aria-valuemin="0" aria-valuemax="${hasAqi ? 500 : 100}" aria-label="${ringTopText}: ${displayValue}, ${displayLabel}">
+        <div class="aq-ring" style="position:relative;width:100px;height:100px;flex-shrink:0;" role="meter" aria-valuenow="${hasAqi ? displayValue : displayValue}" aria-valuemin="0" aria-valuemax="${hasAqi ? 500 : 100}" aria-label="${ringTopText}: ${displayValue}, ${displayLabel}">
           <svg viewBox="0 0 100 100" style="transform:rotate(-90deg);width:100%;height:100%;" aria-hidden="true">
             <title>${ringTopText} ${displayValue}</title>
             <circle cx="50" cy="50" r="${radius}" fill="none" stroke="var(--divider-color, #444)" stroke-width="8"/>
             <circle cx="50" cy="50" r="${radius}" fill="none" stroke="${ringColor}" stroke-width="8" stroke-dasharray="${circ}" stroke-dashoffset="${dashOffset}" stroke-linecap="round" style="transition: stroke-dashoffset 1s ease-out;"/>
           </svg>
-          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;" aria-hidden="true">
-            <div style="font-size:11px;color:var(--secondary-text-color);">${ringTopText}</div>
+          <div class="aq-ring-center" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;" aria-hidden="true">
+            <div class="aq-ring-label" style="font-size:11px;color:var(--secondary-text-color);">${ringTopText}</div>
             <div style="font-size:13px;color:${textColor};font-weight:500;text-align:center;line-height:1.1;margin-top:2px;max-width:80px;">${hasAqi || displayValue === '--' ? displayLabel : displayValue + '%'}</div>
           </div>
         </div>
@@ -620,13 +645,13 @@ class AirQualityCard extends HTMLElement {
 
     this.bottomSection.innerHTML = `
       <div style="padding-top:14px;border-top:1px solid var(--divider-color, #444);">
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
+        <div class="aq-tile-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
           ${this._renderTile('PM1.0', pm1, pm1Unit, pm1S)}
           ${this._renderTile('PM2.5', pm25, pm25Unit, pm25S)}
           ${this._renderTile('PM4.0', pm4, pm4Unit, pm4S)}
           ${this._renderTile('PM10', pm10, pm10Unit, pm10S)}
         </div>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+        <div class="aq-tile-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
           ${this._renderTile('VOC', voc, vocUnit, vocS)}
           ${this._renderTile('CO₂', co2, co2Unit, co2S)}
         </div>
