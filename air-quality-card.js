@@ -92,7 +92,15 @@ class AirQualityCard extends HTMLElement {
     if (config.humid_entity) graphEntities.push({ entity: config.humid_entity, name: "Humidity", color: "#a8c0e0", y_axis: "secondary" });
 
     if (graphEntities.length > 0) {
-      customElements.whenDefined("mini-graph-card").then(() => {
+      // Race whenDefined against a timeout so we degrade gracefully when
+      // mini-graph-card isn't installed. The promise would otherwise hang
+      // forever, leaving an empty band where the graph should be.
+      const ready = customElements.whenDefined("mini-graph-card");
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("mini-graph-card not installed")), 2000)
+      );
+
+      Promise.race([ready, timeout]).then(() => {
         this._graphCard.setConfig({
           type: "custom:mini-graph-card",
           entities: graphEntities,
@@ -112,6 +120,13 @@ class AirQualityCard extends HTMLElement {
         if (this._hass) {
           this._graphCard.hass = this._hass;
         }
+      }).catch(() => {
+        // mini-graph-card isn't installed - hide the graph section
+        // entirely. The rest of the card still works.
+        this._graphConfigured = false;
+        this._graphCard.style.display = "none";
+        if (this.graphSection) this.graphSection.style.display = "none";
+        console.info("[air-quality-card] mini-graph-card not found, temp/humidity history graph disabled. Install via HACS to enable it.");
       });
     } else {
       this._graphCard.style.display = "none";
