@@ -40,6 +40,64 @@ const SCORE_BANDS = [
   { min: -Infinity, color: '#fca5a5', label: 'Bad',      advice: 'Ventilate now' },
 ];
 
+// Pure helpers - extracted from the class so they can be unit-tested
+// without spinning up a DOM. See test/score.test.mjs.
+
+function calcThreshold(value, good, mod, high) {
+  if (value == null) return { label: '--', color: 'var(--secondary-text-color)', pct: 0 };
+  if (value <= good) return { label: 'GOOD', color: '#86efac', pct: Math.min(100, (value / high) * 100) };
+  if (value <= mod) return { label: 'MOD', color: '#fde68a', pct: Math.min(100, (value / high) * 100) };
+  if (value <= high) return { label: 'HIGH', color: '#fdba74', pct: Math.min(100, (value / high) * 100) };
+  return { label: 'V.HIGH', color: '#fca5a5', pct: 100 };
+}
+
+// Computes the calculated-score-mode headline state from the three
+// contributing pollutants. Each pollutant contributes a penalty fraction
+// in [0, 1] times its weight. Missing pollutants are dropped and the
+// remaining weights renormalize to 100, so a partial sensor set still
+// spans 0-100 instead of getting an artificial ceiling.
+//
+// Divisor calibration (the value at which a pollutant's penalty saturates):
+//   PM2.5 75 ug/m3 -> US EPA "Unhealthy for Sensitive Groups" boundary
+//   VOC   500      -> Sensirion VOC Index ceiling (full scale)
+//   CO2   2200 ppm above 400 baseline -> Harvard COGfx cognitive impact threshold
+//
+// Returns: { score, label, color, advice, pct } where score is null when
+// no pollutants are present (empty-state).
+function computeScore({ pm25, voc, co2 }) {
+  const pollutants = [
+    { value: pm25, divisor: 75,   weight: 40 },
+    { value: voc,  divisor: 500,  weight: 25 },
+    { value: co2 != null ? co2 - 400 : null, divisor: 2200, weight: 35 },
+  ].filter(p => p.value != null);
+
+  if (pollutants.length === 0) {
+    return {
+      score: null,
+      label: 'No data',
+      color: '#9ca3af',
+      advice: 'Configure PM2.5, VOC, or CO₂ sensors to see a calculated score.',
+      pct: 0,
+    };
+  }
+
+  const totalWeight = pollutants.reduce((s, p) => s + p.weight, 0);
+  const totalPenalty = pollutants.reduce((s, p) => {
+    const frac = Math.min(1, Math.max(0, p.value / p.divisor));
+    return s + frac * (p.weight / totalWeight) * 100;
+  }, 0);
+  const score = Math.min(100, Math.max(0, Math.round(100 - totalPenalty)));
+  const band = SCORE_BANDS.find(b => score >= b.min);
+
+  return {
+    score,
+    label: band.label,
+    color: band.color,
+    advice: band.advice,
+    pct: score / 100,
+  };
+}
+
 console.info(
   `%c  AIR-QUALITY-CARD  %c  Version ${VERSION}  `,
   'color: white; font-weight: bold; background: #03a9f4',
@@ -95,7 +153,7 @@ class AirQualityCardEditor extends HTMLElement {
     this._form.data = this._config;
   }
 }
-customElements.define("air-quality-card-editor", AirQualityCardEditor);
+if (typeof customElements !== 'undefined') customElements.define("air-quality-card-editor", AirQualityCardEditor);
 
 // ============================================================
 // Main Card Element
@@ -353,11 +411,7 @@ class AirQualityCard extends HTMLElement {
   }
 
   calcThreshold(value, good, mod, high) {
-    if (value == null) return { label: '--', color: 'var(--secondary-text-color)', pct: 0 };
-    if (value <= good) return { label: 'GOOD', color: '#86efac', pct: Math.min(100, (value / high) * 100) };
-    if (value <= mod) return { label: 'MOD', color: '#fde68a', pct: Math.min(100, (value / high) * 100) };
-    if (value <= high) return { label: 'HIGH', color: '#fdba74', pct: Math.min(100, (value / high) * 100) };
-    return { label: 'V.HIGH', color: '#fca5a5', pct: 100 };
+    return calcThreshold(value, good, mod, high);
   }
 
   updateData() {
@@ -405,51 +459,13 @@ class AirQualityCard extends HTMLElement {
 
     } else {
       // --- MODE: CUSTOM SCORE FALLBACK ---
-      // Each pollutant contributes a penalty fraction in [0, 1] times its
-      // weight. Missing pollutants are dropped and the remaining weights
-      // renormalize to 100, so a partial sensor set still spans 0-100
-      // instead of getting an artificial ceiling.
-      //
-      // Divisor calibration (the value at which a pollutant's penalty
-      // saturates):
-      //   PM2.5 75 ug/m3 -> US EPA "Unhealthy for Sensitive Groups" boundary
-      //   VOC   500      -> Sensirion VOC Index ceiling (full scale)
-      //   CO2   2200 ppm above 400 baseline -> Harvard COGfx cognitive
-      //                     impact threshold (~2600 ppm absolute)
-      // Previous (v0.1) divisors were tuned for the additive formula and
-      // were too aggressive once weights renormalized: a single CO2
-      // reading of 1100 ppm dropped the score to ~56 ("Poor"), which
-      // conflicts with the ASHRAE/Harvard guidance saying ~1100 is fine.
-      const pollutants = [
-        { value: pm25, divisor: 75,   weight: 40 },
-        { value: voc,  divisor: 500,  weight: 25 },
-        { value: co2 != null ? co2 - 400 : null, divisor: 2200, weight: 35 },
-      ].filter(p => p.value != null);
-
-      if (pollutants.length === 0) {
-        // No pollutant data at all - render an honest empty state.
-        displayValue = '--';
-        ringTopText = 'SCORE';
-        ringColor = '#9ca3af';
-        displayLabel = 'No data';
-        advice = 'Configure pollutant sensors to see air quality.';
-        dashOffset = circ;
-      } else {
-        const totalWeight = pollutants.reduce((s, p) => s + p.weight, 0);
-        const totalPenalty = pollutants.reduce((s, p) => {
-          const frac = Math.min(1, Math.max(0, p.value / p.divisor));
-          return s + frac * (p.weight / totalWeight) * 100;
-        }, 0);
-        const score = Math.min(100, Math.max(0, Math.round(100 - totalPenalty)));
-
-        displayValue = score;
-        ringTopText = 'SCORE'; // Gauge text
-        const band = SCORE_BANDS.find(b => score >= b.min);
-        ringColor = band.color; displayLabel = band.label; advice = band.advice;
-
-        const scorePct = score / 100;
-        dashOffset = circ - (scorePct * circ);
-      }
+      const result = computeScore({ pm25, voc, co2 });
+      displayValue = result.score == null ? '--' : result.score;
+      ringTopText = 'SCORE';
+      ringColor = result.color;
+      displayLabel = result.label;
+      advice = result.advice;
+      dashOffset = circ - (result.pct * circ);
     }
 
     // Specific pollutant overrides for advice, but only when the headline
@@ -584,12 +600,19 @@ class AirQualityCard extends HTMLElement {
   getCardSize() { return 5; }
 }
 
-customElements.define('air-quality-card', AirQualityCard);
+if (typeof customElements !== 'undefined') {
+  customElements.define('air-quality-card', AirQualityCard);
+}
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "air-quality-card",
-  name: "Air Quality Card",
-  preview: true,
-  description: "A custom card displaying air quality metrics and an overall score."
-});
+if (typeof window !== 'undefined') {
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: "air-quality-card",
+    name: "Air Quality Card",
+    preview: true,
+    description: "A custom card displaying air quality metrics and an overall score."
+  });
+}
+
+// Exports for unit tests (test/score.test.mjs). Browsers ignore these.
+export { computeScore, calcThreshold, AQI_BANDS, SCORE_BANDS, POLLUTANT_THRESHOLDS };

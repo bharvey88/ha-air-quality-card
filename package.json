@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "description": "Home Assistant Air Quality Card",
   "main": "air-quality-card.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/"
   },
   "author": "firstof9",
   "license": "MIT"
