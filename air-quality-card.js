@@ -187,9 +187,18 @@ class AirQualityCard extends HTMLElement {
 
     this.topSection = document.createElement('div');
     this.topSection.style.cursor = 'pointer';
-    this.topSection.addEventListener('click', () => {
+    this.topSection.setAttribute('role', 'button');
+    this.topSection.setAttribute('tabindex', '0');
+    const toggle = () => {
       this._expanded = !this._expanded;
       this.updateData();
+    };
+    this.topSection.addEventListener('click', toggle);
+    this.topSection.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
     });
     content.appendChild(this.topSection);
 
@@ -310,40 +319,45 @@ class AirQualityCard extends HTMLElement {
     const co2S = this.calcThreshold(co2, 800, 1200, 2000);
 
     const renderTile = (name, value, unit, st) => `
-      <div style="padding:0 6px;min-width:0;overflow:hidden;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px;">
+      <div style="padding:0 6px;min-width:0;overflow:hidden;" role="group" aria-label="${name}: ${value.toLocaleString()} ${unit}, ${st.label}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px;" aria-hidden="true">
           <span style="font-size:11px;color:var(--secondary-text-color);font-weight:500;">${name}</span>
           <span style="font-size:9px;color:${st.color};">${st.label}</span>
         </div>
-        <div style="display:flex;align-items:baseline;gap:4px;">
+        <div style="display:flex;align-items:baseline;gap:4px;" aria-hidden="true">
           <span style="font-size:22px;font-weight:400;line-height:1;">${value.toLocaleString()}</span>
           <span style="font-size:10px;color:var(--secondary-text-color);">${unit}</span>
         </div>
-        <div style="height:3px;background:var(--divider-color, #444);border-radius:2px;overflow:hidden;margin-top:8px;">
+        <div style="height:3px;background:var(--divider-color, #444);border-radius:2px;overflow:hidden;margin-top:8px;" role="progressbar" aria-valuenow="${Math.round(st.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="${name} level">
           <div style="height:100%;width:${st.pct}%;background:${st.color};"></div>
         </div>
       </div>
     `;
 
+    const headlineUnit = hasAqi ? (aqiStateObj.attributes.unit_of_measurement || 'AQI') : '/ 100';
+    const headlineAriaLabel = `${this.config.title || 'Air quality'}: ${displayLabel}, ${displayValue} ${headlineUnit}`.trim();
+
     if (!this._expanded) {
       this.graphSection.style.display = 'none';
       this.bottomSection.style.display = 'none';
+      this.topSection.setAttribute('aria-expanded', 'false');
+      this.topSection.setAttribute('aria-label', `${headlineAriaLabel}. Activate to expand.`);
       this.topSection.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;gap:12px;">
-            <ha-icon icon="mdi:chevron-down" style="color:var(--secondary-text-color); transition: transform 0.3s;"></ha-icon>
+            <ha-icon icon="mdi:chevron-down" style="color:var(--secondary-text-color); transition: transform 0.3s;" aria-hidden="true"></ha-icon>
             <div>
               <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
               <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;" role="status" aria-live="polite">
             <div style="display:flex;align-items:baseline;gap:4px;">
               <span style="font-size:18px;font-weight:400;color:${ringColor};">${displayValue}</span>
               <span style="font-size:10px;color:var(--secondary-text-color);">${hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100'}</span>
             </div>
             <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${ringColor};display:flex;align-items:center;gap:6px;">
-              <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;"></span>${displayLabel}
+              <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;" aria-hidden="true"></span>${displayLabel}
             </div>
           </div>
         </div>
@@ -351,13 +365,16 @@ class AirQualityCard extends HTMLElement {
       return;
     }
 
+    this.topSection.setAttribute('aria-expanded', 'true');
+    this.topSection.setAttribute('aria-label', `${headlineAriaLabel}. Activate to collapse.`);
+
     this.graphSection.style.display = (this._graphConfigured ? 'block' : 'none');
     this.bottomSection.style.display = 'block';
 
     this.topSection.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <ha-icon icon="mdi:chevron-up" style="color:var(--secondary-text-color); transition: transform 0.3s;"></ha-icon>
+          <ha-icon icon="mdi:chevron-up" style="color:var(--secondary-text-color); transition: transform 0.3s;" aria-hidden="true"></ha-icon>
           <div>
             <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
             <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
@@ -370,37 +387,38 @@ class AirQualityCard extends HTMLElement {
         <div style="flex-grow: 1; overflow: hidden; padding-right: 14px;">
           <div style="font-size:12px;color:var(--secondary-text-color);margin-bottom:4px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${topName}">${topName}</div>
           
-          <div style="display:flex;align-items:baseline;gap:6px;">
+          <div style="display:flex;align-items:baseline;gap:6px;" role="status" aria-live="polite" aria-label="${headlineAriaLabel}">
             <span style="font-size:54px;font-weight:400;color:${ringColor};line-height:1;">${displayValue}</span>
             <span style="font-size:14px;color:var(--secondary-text-color);">${hasAqi ? '' : '/ 100'}</span>
           </div>
           <div style="font-size:12px;color:var(--secondary-text-color);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${advice}</div>
 
           <div style="display:flex;gap:14px;margin-top:14px;">
-            <div>
+            <div aria-label="Temperature: ${temp.toFixed(1)} ${tempUnit}">
               <div style="display:flex;align-items:baseline;gap:4px;">
                 <span style="font-size:24px;font-weight:400;">${temp.toFixed(1)}</span>
                 <span style="font-size:11px;color:var(--secondary-text-color);">${tempUnit}</span>
               </div>
-              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;">TEMP</div>
+              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">TEMP</div>
             </div>
-            <div style="width:1px;background:var(--divider-color, #444);"></div>
-            <div>
+            <div style="width:1px;background:var(--divider-color, #444);" aria-hidden="true"></div>
+            <div aria-label="Humidity: ${humid.toFixed(0)} ${humidUnit}">
               <div style="display:flex;align-items:baseline;gap:4px;">
                 <span style="font-size:24px;font-weight:400;">${humid.toFixed(0)}</span>
                 <span style="font-size:11px;color:var(--secondary-text-color);">${humidUnit}</span>
               </div>
-              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;">HUMIDITY</div>
+              <div style="font-size:10px;color:var(--secondary-text-color);margin-top:2px;" aria-hidden="true">HUMIDITY</div>
             </div>
           </div>
         </div>
 
-        <div style="position:relative;width:100px;height:100px;flex-shrink:0;">
-          <svg viewBox="0 0 100 100" style="transform:rotate(-90deg);width:100%;height:100%;">
+        <div style="position:relative;width:100px;height:100px;flex-shrink:0;" role="meter" aria-valuenow="${hasAqi ? displayValue : displayValue}" aria-valuemin="0" aria-valuemax="${hasAqi ? 500 : 100}" aria-label="${ringTopText}: ${displayValue}, ${displayLabel}">
+          <svg viewBox="0 0 100 100" style="transform:rotate(-90deg);width:100%;height:100%;" aria-hidden="true">
+            <title>${ringTopText} ${displayValue}</title>
             <circle cx="50" cy="50" r="${radius}" fill="none" stroke="var(--divider-color, #444)" stroke-width="8"/>
             <circle cx="50" cy="50" r="${radius}" fill="none" stroke="${ringColor}" stroke-width="8" stroke-dasharray="${circ}" stroke-dashoffset="${dashOffset}" stroke-linecap="round" style="transition: stroke-dashoffset 1s ease-out;"/>
           </svg>
-          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;" aria-hidden="true">
             <div style="font-size:11px;color:var(--secondary-text-color);">${ringTopText}</div>
             <div style="font-size:13px;color:${ringColor};font-weight:500;text-align:center;line-height:1.1;margin-top:2px;max-width:80px;">${hasAqi ? displayLabel : displayValue + '%'}</div>
           </div>
