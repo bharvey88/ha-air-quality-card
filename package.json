@@ -1,0 +1,14 @@
+{
+  "name": "ha-air-quality-card",
+  "version": "0.0.1",
+  "description": "Home Assistant Air Quality Card",
+  "main": "air-quality-card.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "firstof9",
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.0.0"
+  }
+}
