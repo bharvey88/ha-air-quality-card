@@ -77,6 +77,23 @@ class AirQualityCard extends HTMLElement {
   }
 
   setConfig(config) {
+    if (!config || typeof config !== 'object') {
+      throw new Error('Invalid configuration: expected an object');
+    }
+
+    const entityKeys = [
+      'aqi_entity', 'temp_entity', 'humid_entity',
+      'pm1_entity', 'pm25_entity', 'pm4_entity', 'pm10_entity',
+      'voc_entity', 'co2_entity'
+    ];
+    for (const key of entityKeys) {
+      const value = config[key];
+      if (value == null || value === '') continue;
+      if (typeof value !== 'string' || !value.startsWith('sensor.')) {
+        throw new Error(`${key} must be a sensor.* entity, got: ${value}`);
+      }
+    }
+
     this.config = config;
 
     if (this._expanded === undefined) {
