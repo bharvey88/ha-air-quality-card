@@ -334,6 +334,24 @@ class AirQualityCard extends HTMLElement {
     return this._hass.states[entityId].attributes?.unit_of_measurement || defaultUnit;
   }
 
+  _renderTile(name, value, unit, st) {
+    return `
+      <div style="padding:0 6px;min-width:0;overflow:hidden;${value == null ? 'opacity:0.5;' : ''}" role="group" aria-label="${name}: ${value == null ? 'no data' : value.toLocaleString() + ' ' + unit}, ${st.label}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px;" aria-hidden="true">
+          <span style="font-size:11px;color:var(--secondary-text-color);font-weight:500;">${name}</span>
+          <span style="font-size:9px;color:${st.color};">${st.label}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:4px;" aria-hidden="true">
+          <span style="font-size:22px;font-weight:400;line-height:1;">${value == null ? '--' : value.toLocaleString()}</span>
+          <span style="font-size:10px;color:var(--secondary-text-color);">${value == null ? '' : unit}</span>
+        </div>
+        <div style="height:3px;background:var(--divider-color, #444);border-radius:2px;overflow:hidden;margin-top:8px;" role="progressbar" aria-valuenow="${Math.round(st.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="${name} level">
+          <div style="height:100%;width:${st.pct}%;background:${st.color};"></div>
+        </div>
+      </div>
+    `;
+  }
+
   calcThreshold(value, good, mod, high) {
     if (value == null) return { label: '--', color: 'var(--secondary-text-color)', pct: 0 };
     if (value <= good) return { label: 'GOOD', color: '#86efac', pct: Math.min(100, (value / high) * 100) };
@@ -454,21 +472,6 @@ class AirQualityCard extends HTMLElement {
     const vocS  = this.calcThreshold(voc,  T.voc.good,  T.voc.mod,  T.voc.high);
     const co2S  = this.calcThreshold(co2,  T.co2.good,  T.co2.mod,  T.co2.high);
 
-    const renderTile = (name, value, unit, st) => `
-      <div style="padding:0 6px;min-width:0;overflow:hidden;${value == null ? 'opacity:0.5;' : ''}" role="group" aria-label="${name}: ${value == null ? 'no data' : value.toLocaleString() + ' ' + unit}, ${st.label}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:4px;" aria-hidden="true">
-          <span style="font-size:11px;color:var(--secondary-text-color);font-weight:500;">${name}</span>
-          <span style="font-size:9px;color:${st.color};">${st.label}</span>
-        </div>
-        <div style="display:flex;align-items:baseline;gap:4px;" aria-hidden="true">
-          <span style="font-size:22px;font-weight:400;line-height:1;">${value == null ? '--' : value.toLocaleString()}</span>
-          <span style="font-size:10px;color:var(--secondary-text-color);">${value == null ? '' : unit}</span>
-        </div>
-        <div style="height:3px;background:var(--divider-color, #444);border-radius:2px;overflow:hidden;margin-top:8px;" role="progressbar" aria-valuenow="${Math.round(st.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="${name} level">
-          <div style="height:100%;width:${st.pct}%;background:${st.color};"></div>
-        </div>
-      </div>
-    `;
 
     const headlineUnit = hasAqi ? (aqiStateObj.attributes.unit_of_measurement || 'AQI') : '/ 100';
     const headlineAriaLabel = `${this.config.title || 'Air quality'}: ${displayLabel}, ${displayValue} ${headlineUnit}`.trim();
@@ -565,14 +568,14 @@ class AirQualityCard extends HTMLElement {
     this.bottomSection.innerHTML = `
       <div style="padding-top:14px;border-top:1px solid var(--divider-color, #444);">
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
-          ${renderTile('PM1.0', pm1, pm1Unit, pm1S)}
-          ${renderTile('PM2.5', pm25, pm25Unit, pm25S)}
-          ${renderTile('PM4.0', pm4, pm4Unit, pm4S)}
-          ${renderTile('PM10', pm10, pm10Unit, pm10S)}
+          ${this._renderTile('PM1.0', pm1, pm1Unit, pm1S)}
+          ${this._renderTile('PM2.5', pm25, pm25Unit, pm25S)}
+          ${this._renderTile('PM4.0', pm4, pm4Unit, pm4S)}
+          ${this._renderTile('PM10', pm10, pm10Unit, pm10S)}
         </div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
-          ${renderTile('VOC', voc, vocUnit, vocS)}
-          ${renderTile('CO₂', co2, co2Unit, co2S)}
+          ${this._renderTile('VOC', voc, vocUnit, vocS)}
+          ${this._renderTile('CO₂', co2, co2Unit, co2S)}
         </div>
       </div>
     `;
