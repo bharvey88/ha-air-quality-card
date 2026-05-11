@@ -1,6 +1,14 @@
 # Air Quality Card
 
-A Home Assistant custom card for displaying air quality data.
+A modern, highly customizable air quality card for Home Assistant with support for multiple pollutants, climate trends, and an interactive expand/collapse feature.
+
+## Screenshots
+
+````carousel
+![Expanded State](file:///home/firstof9/github/ha-air-quality-card/screenshots/expanded.png)
+<!-- slide -->
+![Collapsed State](file:///home/firstof9/github/ha-air-quality-card/screenshots/collapsed.png)
+````
 
 ## Installation
 
