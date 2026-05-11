@@ -295,10 +295,15 @@ class AirQualityCard extends HTMLElement {
       dashOffset = circ - (scorePct * circ);
     }
 
-    // Specific pollutant overrides for advice (works in both modes)
-    if (voc > 200) advice = 'VOCs detected';
-    if (co2 > 1000) advice = 'CO2 high - open a window';
-    if (co2 > 1500) advice = 'CO2 very high - ventilate';
+    // Specific pollutant overrides for advice, but only when the headline
+    // state is benign. Otherwise an AQI 450 reading would have its
+    // "Emergency health warning" replaced with the meeker "open a window".
+    const headlineIsBenign = displayLabel === 'Good' || displayLabel === 'Moderate';
+    if (headlineIsBenign) {
+      if (voc > 200) advice = 'VOCs detected';
+      if (co2 > 1000) advice = 'CO2 high - open a window';
+      if (co2 > 1500) advice = 'CO2 very high - ventilate';
+    }
 
     const r = parseInt(ringColor.slice(1, 3), 16), g = parseInt(ringColor.slice(3, 5), 16), b = parseInt(ringColor.slice(5, 7), 16);
 
