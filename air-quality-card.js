@@ -9,74 +9,41 @@ class AirQualityCardEditor extends HTMLElement {
 
   setConfig(config) {
     this._config = config;
-    if (this._hass) this.renderForm();
+    this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._config) this.renderForm();
+    this._render();
+  }
 
-    const pickers = this.shadowRoot?.querySelectorAll("ha-entity-picker");
-    if (pickers) {
-      pickers.forEach(picker => { picker.hass = hass; });
+  _render() {
+    if (!this._hass || !this._config) return;
+
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.schema = [
+        { name: "title", label: "Card Title", selector: { text: {} } },
+        { name: "default_expanded", label: "Expanded by Default", selector: { boolean: {} } },
+        { name: "aqi_entity", label: "AQI Sensor (Optional)", selector: { entity: { domain: "sensor", device_class: "aqi" } } },
+        { name: "temp_entity", label: "Temperature Sensor", selector: { entity: { domain: "sensor", device_class: "temperature" } } },
+        { name: "humid_entity", label: "Humidity Sensor", selector: { entity: { domain: "sensor", device_class: "humidity" } } },
+        { name: "pm1_entity", label: "PM1.0 Sensor", selector: { entity: { domain: "sensor", device_class: "pm1" } } },
+        { name: "pm25_entity", label: "PM2.5 Sensor", selector: { entity: { domain: "sensor", device_class: "pm25" } } },
+        { name: "pm4_entity", label: "PM4.0 Sensor", selector: { entity: { domain: "sensor" } } },
+        { name: "pm10_entity", label: "PM10 Sensor", selector: { entity: { domain: "sensor", device_class: "pm10" } } },
+        { name: "voc_entity", label: "VOC Index Sensor", selector: { entity: { domain: "sensor", device_class: "volatile_organic_compounds" } } },
+        { name: "co2_entity", label: "CO2 Sensor (ppm)", selector: { entity: { domain: "sensor", device_class: "carbon_dioxide" } } },
+      ];
+      this._form.computeLabel = (schema) => schema.label || schema.name;
+      this._form.addEventListener("value-changed", (ev) => {
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: ev.detail.value } }));
+      });
+      this.shadowRoot.appendChild(this._form);
     }
-  }
 
-  renderForm() {
-    if (!this._config || this._rendered) return;
-    this._rendered = true;
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        .container { display: flex; flex-direction: column; gap: 24px; padding: 8px 0; }
-        ha-entity-picker { display: block; width: 100%; }
-        .section-title { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); margin-bottom: -12px; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .title-wrapper { display: flex; flex-direction: column; margin-bottom: -8px; }
-        .title-wrapper label { font-size: 12px; color: var(--secondary-text-color); margin-bottom: 8px; font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif); }
-        .title-wrapper input { width: 100%; box-sizing: border-box; padding: 10px 8px; font-size: 16px; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 4px; background: var(--card-background-color, #fff); color: var(--primary-text-color, #212121); font-family: inherit; transition: border-color 0.2s; }
-        .title-wrapper input:focus { outline: none; border-color: var(--primary-color, #03a9f4); border-width: 2px; padding: 9px 7px; }
-      </style>
-      
-      <div class="container">
-        <div class="title-wrapper">
-          <label for="title">Card Title</label>
-          <input type="text" id="title" value="${this._config.title || ''}" placeholder="e.g. Living Room">
-        </div>
-        
-        <div class="section-title">Primary AQI Sensor (Optional)</div>
-        <ha-entity-picker id="aqi_entity" label="AQI Sensor (Leave blank for custom score)" allow-custom-entity include-domains='["sensor"]' value="${this._config.aqi_entity || ''}"></ha-entity-picker>
-
-        <div class="section-title">Climate Sensors</div>
-        <ha-entity-picker id="temp_entity" label="Temperature Sensor" allow-custom-entity include-domains='["sensor"]' value="${this._config.temp_entity || ''}"></ha-entity-picker>
-        <ha-entity-picker id="humid_entity" label="Humidity Sensor" allow-custom-entity include-domains='["sensor"]' value="${this._config.humid_entity || ''}"></ha-entity-picker>
-        
-        <div class="section-title">Particulate Matter</div>
-        <ha-entity-picker id="pm1_entity" label="PM1.0 Sensor" allow-custom-entity include-domains='["sensor"]' value="${this._config.pm1_entity || ''}"></ha-entity-picker>
-        <ha-entity-picker id="pm25_entity" label="PM2.5 Sensor" allow-custom-entity include-domains='["sensor"]' value="${this._config.pm25_entity || ''}"></ha-entity-picker>
-        <ha-entity-picker id="pm10_entity" label="PM10 Sensor" allow-custom-entity include-domains='["sensor"]' value="${this._config.pm10_entity || ''}"></ha-entity-picker>
-        
-        <div class="section-title">Gases & Pollutants</div>
-        <ha-entity-picker id="voc_entity" label="VOC Index Sensor" allow-custom-entity include-domains='["sensor"]' value="${this._config.voc_entity || ''}"></ha-entity-picker>
-        <ha-entity-picker id="co2_entity" label="CO2 Sensor (ppm)" allow-custom-entity include-domains='["sensor"]' value="${this._config.co2_entity || ''}"></ha-entity-picker>
-      </div>
-    `;
-
-    this.shadowRoot.querySelectorAll("input").forEach(el => el.addEventListener("input", this.valueChanged.bind(this)));
-    this.shadowRoot.querySelectorAll("ha-entity-picker").forEach(picker => {
-      picker.hass = this._hass;
-      picker.addEventListener("value-changed", this.valueChanged.bind(this));
-    });
-  }
-
-  valueChanged(ev) {
-    if (!this._config) return;
-    const target = ev.target;
-    const newValue = target.value;
-    if (this._config[target.id] === newValue) return;
-    const newConfig = Object.assign({}, this._config);
-    newConfig[target.id] = newValue;
-    this._config = newConfig;
-    this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: newConfig }, bubbles: true, composed: true }));
+    this._form.hass = this._hass;
+    this._form.data = this._config;
   }
 }
 customElements.define("air-quality-card-editor", AirQualityCardEditor);
@@ -100,6 +67,10 @@ class AirQualityCard extends HTMLElement {
 
   setConfig(config) {
     this.config = config;
+
+    if (this._expanded === undefined) {
+      this._expanded = config.default_expanded !== false;
+    }
 
     if (!this._graphCard) {
       this._graphCard = document.createElement("mini-graph-card");
@@ -204,6 +175,11 @@ class AirQualityCard extends HTMLElement {
     const content = document.createElement('div');
 
     this.topSection = document.createElement('div');
+    this.topSection.style.cursor = 'pointer';
+    this.topSection.addEventListener('click', () => {
+      this._expanded = !this._expanded;
+      this.updateData();
+    });
     content.appendChild(this.topSection);
 
     this.graphSection = document.createElement('div');
@@ -256,6 +232,7 @@ class AirQualityCard extends HTMLElement {
 
     const pm1 = this.safeNum(this.config.pm1_entity);
     const pm25 = this.safeNum(this.config.pm25_entity);
+    const pm4 = this.safeNum(this.config.pm4_entity);
     const pm10 = this.safeNum(this.config.pm10_entity);
     const voc = this.safeNum(this.config.voc_entity);
     const co2 = this.safeNum(this.config.co2_entity);
@@ -266,6 +243,7 @@ class AirQualityCard extends HTMLElement {
     const humidUnit = this.getUnit(this.config.humid_entity, '%');
     const pm1Unit = this.getUnit(this.config.pm1_entity, 'µg/m³');
     const pm25Unit = this.getUnit(this.config.pm25_entity, 'µg/m³');
+    const pm4Unit = this.getUnit(this.config.pm4_entity, 'µg/m³');
     const pm10Unit = this.getUnit(this.config.pm10_entity, 'µg/m³');
     const vocUnit = this.getUnit(this.config.voc_entity, 'index');
     const co2Unit = this.getUnit(this.config.co2_entity, 'ppm');
@@ -315,6 +293,7 @@ class AirQualityCard extends HTMLElement {
 
     const pm1S = this.calcThreshold(pm1, 10, 25, 50);
     const pm25S = this.calcThreshold(pm25, 12, 35, 75);
+    const pm4S = this.calcThreshold(pm4, 20, 50, 100);
     const pm10S = this.calcThreshold(pm10, 50, 150, 250);
     const vocS = this.calcThreshold(voc, 100, 200, 300);
     const co2S = this.calcThreshold(co2, 800, 1200, 2000);
@@ -335,15 +314,45 @@ class AirQualityCard extends HTMLElement {
       </div>
     `;
 
+    if (!this._expanded) {
+      this.graphSection.style.display = 'none';
+      this.bottomSection.style.display = 'none';
+      this.topSection.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <ha-icon icon="mdi:chevron-down" style="color:var(--secondary-text-color); transition: transform 0.3s;"></ha-icon>
+            <div>
+              <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
+              <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="display:flex;align-items:baseline;gap:4px;">
+              <span style="font-size:18px;font-weight:400;color:${ringColor};">${displayValue}</span>
+              <span style="font-size:10px;color:var(--secondary-text-color);">${hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100'}</span>
+            </div>
+            <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${ringColor};display:flex;align-items:center;gap:6px;">
+              <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;"></span>${displayLabel}
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    this.graphSection.style.display = (this._graphConfigured ? 'block' : 'none');
+    this.bottomSection.style.display = 'block';
+
     this.topSection.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
-        <div>
-          <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
-          <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <ha-icon icon="mdi:chevron-up" style="color:var(--secondary-text-color); transition: transform 0.3s;"></ha-icon>
+          <div>
+            <div style="font-size:15px;font-weight:500;">${this.config.title || 'Living Room'}</div>
+            <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
+          </div>
         </div>
-        <div style="background:rgba(${r},${g},${b},0.12);border:1px solid rgba(${r},${g},${b},0.35);border-radius:999px;padding:5px 12px;font-size:11px;color:${ringColor};display:flex;align-items:center;gap:6px;">
-          <span style="width:6px;height:6px;background:${ringColor};border-radius:50%;"></span>${displayLabel}
-        </div>
+        <!-- Indicator hidden when expanded as requested -->
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
@@ -390,9 +399,10 @@ class AirQualityCard extends HTMLElement {
 
     this.bottomSection.innerHTML = `
       <div style="padding-top:14px;border-top:1px solid var(--divider-color, #444);">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
           ${renderTile('PM1.0', pm1, pm1Unit, pm1S)}
           ${renderTile('PM2.5', pm25, pm25Unit, pm25S)}
+          ${renderTile('PM4.0', pm4, pm4Unit, pm4S)}
           ${renderTile('PM10', pm10, pm10Unit, pm10S)}
         </div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
