@@ -13,6 +13,10 @@ A modern, highly customizable air quality card for Home Assistant with support f
 ### Visual Configuration
 ![Configuration Editor](screenshots/config.png)
 
+## Requirements
+
+This card optionally uses [mini-graph-card](https://github.com/kalkih/mini-graph-card) to display temperature and humidity trend graphs. **The card will function normally without it**, but the trend graphs will not be displayed.
+
 ## Installation
 
 ### HACS (Recommended)
@@ -38,5 +42,11 @@ A modern, highly customizable air quality card for Home Assistant with support f
 
 ```yaml
 type: custom:air-quality-card
-entity: sensor.air_quality
+title: Living Room
+aqi_entity: sensor.air_quality_index # Optional: If not provided, a score will be calculated from available pollutants
+temp_entity: sensor.living_room_temperature
+humid_entity: sensor.living_room_humidity
+pm25_entity: sensor.living_room_pm2_5
+pm10_entity: sensor.living_room_pm10
+# Optional: pm1_entity, pm4_entity, voc_entity, co2_entity, default_expanded
 ```
