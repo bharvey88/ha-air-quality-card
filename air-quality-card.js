@@ -447,7 +447,7 @@ class AirQualityCard extends HTMLElement {
               <div style="font-size:11px;color:var(--secondary-text-color);margin-top:2px;">Climate · Air Quality</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:12px;" role="status" aria-live="polite">
+          <div style="display:flex;align-items:center;gap:12px;" role="group" aria-label="${headlineAriaLabel}">
             <div style="display:flex;align-items:baseline;gap:4px;">
               <span style="font-size:18px;font-weight:400;color:${ringColor};">${displayValue}</span>
               <span style="font-size:10px;color:var(--secondary-text-color);">${displayValue === '--' ? '' : (hasAqi ? (aqiStateObj.attributes.unit_of_measurement || '') : '/ 100')}</span>
@@ -483,7 +483,7 @@ class AirQualityCard extends HTMLElement {
         <div style="flex-grow: 1; overflow: hidden; padding-right: 14px;">
           <div style="font-size:12px;color:var(--secondary-text-color);margin-bottom:4px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${topName}">${topName}</div>
           
-          <div style="display:flex;align-items:baseline;gap:6px;" role="status" aria-live="polite" aria-label="${headlineAriaLabel}">
+          <div style="display:flex;align-items:baseline;gap:6px;" role="group" aria-label="${headlineAriaLabel}">
             <span style="font-size:54px;font-weight:400;color:${ringColor};line-height:1;">${displayValue}</span>
             <span style="font-size:14px;color:var(--secondary-text-color);">${hasAqi || displayValue === '--' ? '' : '/ 100'}</span>
           </div>
