@@ -316,10 +316,12 @@ class AirQualityCard extends HTMLElement {
   }
 
   updateData() {
-    // Determine if we have a valid AQI sensor
+    // Determine if we have a valid AQI sensor. Some integrations report
+    // textual states like "Good" - those should fall back to score mode
+    // rather than display NaN under the AQI sensor's friendly name.
     const aqiStateObj = this.config.aqi_entity ? this._hass.states[this.config.aqi_entity] : null;
-    const hasAqi = aqiStateObj && aqiStateObj.state !== 'unavailable' && aqiStateObj.state !== 'unknown';
-    const aqi = hasAqi ? parseFloat(aqiStateObj.state) : 0;
+    const aqi = aqiStateObj ? parseFloat(aqiStateObj.state) : NaN;
+    const hasAqi = aqiStateObj && !isNaN(aqi);
 
     // Fetch the friendly name to display above the score
     const topName = hasAqi ? (aqiStateObj.attributes.friendly_name || 'AQI Sensor') : 'Calculated Score';
@@ -346,7 +348,7 @@ class AirQualityCard extends HTMLElement {
     const radius = 42;
     const circ = 2 * Math.PI * radius;
 
-    if (hasAqi && !isNaN(aqi)) {
+    if (hasAqi) {
       // --- MODE: OFFICIAL AQI ---
       displayValue = Math.round(aqi);
       ringTopText = 'AQI'; // Gauge text
